@@ -1,13 +1,37 @@
-const express = require("express");
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 
-const site = await Bun.file("./index.html").text();
+// Load the HTML template at startup (fail fast if missing)
+const sitePath = path.join(__dirname, 'index.html');
+let template;
+try {
+  template = fs.readFileSync(sitePath, 'utf8');
+} catch (err) {
+  console.error(`Failed to read template ${sitePath}:`, err);
+  process.exit(1);
+}
 
-app.get("/", async (req, res) => {
-  let greet = site.replace("%%_USER_NAME%%", req.query.name);
-  res.send(greet);
+// Simple, safe HTML escaper to prevent XSS when inserting user-provided values
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/\//g, '&#x2F;');
+}
+
+app.get('/', (req, res) => {
+  const rawName = req.query.name;
+  const name = rawName ? escapeHtml(rawName) : 'there';
+  const greet = template.replace('%%_USER_NAME%%', name);
+  res.type('html').send(greet);
 });
 
-app.listen(8080, () => {
-  console.log("The webpage is live on http://localhost:8080 :)");
+const port = process.env.PORT || 8080;
+app.listen(port, () => {
+  console.log(`The webpage is live on http://localhost:${port} :)`);
 });
